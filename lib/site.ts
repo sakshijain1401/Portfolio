@@ -2,7 +2,7 @@ export const site = {
   name: "Sakshi Jain",
   role: "Marketing Strategist and Planner",
   place: "Noida, India",
-  email: "hello@sakshi.mail",
+  email: "sakshijain1401@gmail.com",
 } as const;
 
 export const beats = [
