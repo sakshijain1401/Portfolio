@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, IBM_Plex_Mono, Outfit } from "next/font/google";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/next";
 import { Atmosphere } from "@/components/Atmosphere";
 import "./globals.css";
 
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </Script>
         <Atmosphere />
         {children}
+        <Analytics />
       </body>
     </html>
   );
