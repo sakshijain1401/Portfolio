@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { prefersCoarsePointer } from "@/lib/nav-memory";
 import { site } from "@/lib/site";
 
 /** Chosen from Sakshi’s skill set — short enough to pack, then shatter into the name. */
@@ -314,6 +315,9 @@ export function Desk() {
 
     const reduce = document.documentElement.classList.contains("reduce");
     const mouse = { x: -9999, y: -9999, inside: false };
+    const coarsePointer = prefersCoarsePointer();
+    let layoutW = 0;
+    let layoutH = 0;
     let words: Word[] = [];
     let particles: Particle[] = [];
     let sans = "sans-serif";
@@ -367,6 +371,11 @@ export function Desk() {
       const w = root.clientWidth;
       const h = root.clientHeight;
       if (w < 2 || h < 2) return;
+      // Mobile chrome / visual viewport jitters would otherwise rebuild the
+      // name from word-dots and look like a shatter on every scroll.
+      if (layoutW > 0 && Math.abs(w - layoutW) < 3 && Math.abs(h - layoutH) < 48) return;
+      layoutW = w;
+      layoutH = h;
       canvas.width = Math.round(w * dprCap);
       canvas.height = Math.round(h * dprCap);
       ctx.setTransform(dprCap, 0, 0, dprCap, 0, 0);
@@ -377,9 +386,10 @@ export function Desk() {
       words = packWords(w, h, sans);
       const homes = sampleNameDots(raster.pixels, w, h, raster.size);
       particles = shatterWords(words, homes, sans, w, h);
+      const formed = opened;
       for (const p of particles) {
-        p.x = p.bx;
-        p.y = p.by;
+        p.x = formed ? p.hx : p.bx;
+        p.y = formed ? p.hy : p.by;
         p.vx = 0;
         p.vy = 0;
       }
@@ -487,7 +497,7 @@ export function Desk() {
         } else {
           let tx = p.hx;
           let ty = p.hy;
-          if (mouse.inside) {
+          if (mouse.inside && !coarsePointer) {
             const mdx = p.hx - mouse.x;
             const mdy = p.hy - mouse.y;
             const dist = Math.hypot(mdx, mdy);
@@ -510,7 +520,7 @@ export function Desk() {
             p.x += p.vx;
             p.y += p.vy;
           }
-          if (mouse.inside) {
+          if (mouse.inside && !coarsePointer) {
             warm = Math.max(0, 1 - Math.hypot(p.x - mouse.x, p.y - mouse.y) / radius);
           }
           size = p.s * (1 + warm * 0.35);
@@ -576,7 +586,7 @@ export function Desk() {
 
       if (!live) drawWords(now, holdT, crossT);
 
-      if (live && mouse.inside) {
+      if (live && mouse.inside && !coarsePointer) {
         if (!mouseGlow || mouseGlowX !== mouse.x || mouseGlowY !== mouse.y) {
           const radius = Math.min(w, h) * 0.12;
           mouseGlow = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, radius);
@@ -607,6 +617,7 @@ export function Desk() {
       start = performance.now() - TOTAL;
     };
     const onMove = (event: PointerEvent) => {
+      if (coarsePointer || event.pointerType === "touch") return;
       const rect = canvas.getBoundingClientRect();
       mouse.x = event.clientX - rect.left;
       mouse.y = event.clientY - rect.top;
@@ -615,6 +626,7 @@ export function Desk() {
     };
     const onLeave = () => {
       mouse.inside = false;
+      mouseGlow = null;
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") skip();
@@ -660,6 +672,8 @@ export function Desk() {
     window.addEventListener("scroll", onScrollPin, { passive: true });
     root.addEventListener("pointermove", onMove);
     root.addEventListener("pointerleave", onLeave);
+    root.addEventListener("pointerup", onLeave);
+    root.addEventListener("pointercancel", onLeave);
     window.addEventListener("keydown", onKey);
 
     return () => {
@@ -674,6 +688,8 @@ export function Desk() {
       window.removeEventListener("scroll", onScrollPin);
       root.removeEventListener("pointermove", onMove);
       root.removeEventListener("pointerleave", onLeave);
+      root.removeEventListener("pointerup", onLeave);
+      root.removeEventListener("pointercancel", onLeave);
       window.removeEventListener("keydown", onKey);
     };
   }, []);
